@@ -1,7 +1,7 @@
 # AS AppBox
 
 AS AppBox is an application manager that helps you organize and quickly launch your favorite programs. Built with AutoHotkey v2, it offers a modern and user-friendly interface.\
-![Screenshot](https://github.com/akcansoft/AS-AppBox/blob/main/AppBox-SS-1.png)
+![Screenshot](https://github.com/mesutakcan/AS-AppBox/blob/main/AppBox-SS-1.png)
 
 ## Features
 
@@ -18,7 +18,7 @@ AS AppBox is an application manager that helps you organize and quickly launch y
 ## Installation & Run
 
 1. Install [AutoHotkey v2](https://www.autohotkey.com/).
-2. Download the [AppBox.ahk](https://github.com/akcansoft/AS-AppBox/blob/main/AppBox.ahk) file.
+2. Download the [AppBox.ahk](https://github.com/mesutakcan/AS-AppBox/blob/main/AppBox.ahk) file.
 3. Double-click the script to run.
 
 ## Usage
@@ -47,9 +47,9 @@ AS AppBox is an application manager that helps you organize and quickly launch y
 ## Developer
 
 Mesut Akcan
-- [akcansoft.blogspot.com](https://akcansoft.blogspot.com)
+- [mesutakcan.blogspot.com](https://mesutakcan.blogspot.com)
 - [youtube.com/mesutakcan](https://youtube.com/mesutakcan)
-- [github.com/akcansoft](https://github.com/akcansoft)
+- [github.com/mesutakcan](https://github.com/mesutakcan)
 
 ## Contributing
 Contributions are welcome! If you'd like to add features, fix bugs, or improve the code, feel free to open a pull request.
