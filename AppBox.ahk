@@ -22,7 +22,7 @@ Mesut Akcan
 makcan@gmail.com
 youtube.com/mesutakcan
 mesutakcan.blogspot.com
-github.com/akcansoft
+github.com/mesutakcan
 -----------------------------
 */
 
@@ -529,9 +529,8 @@ About(*) {
 Mesut Akcan
 makcan@gmail.com
 
-akcansoft.blogspot.com
 mesutakcan.blogspot.com
-github.com/akcansoft
+github.com/mesutakcan
 youtube.com/mesutakcan
 )", appName, appVer), "About", "Owner" mGui.Hwnd)
 }
