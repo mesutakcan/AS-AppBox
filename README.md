@@ -3,7 +3,7 @@
 [![AutoHotkey](https://img.shields.io/badge/Language-AutoHotkey_v2-green.svg)](https://www.autohotkey.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-blue.svg)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/License-GPL_v3-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.1-brightgreen.svg)](https://github.com/mesutakcan/AS-AppBox/releases)
+[![Version](https://img.shields.io/badge/Version-1.2-brightgreen.svg)](https://github.com/mesutakcan/AS-AppBox/releases)
 
 ![GitHub stars](https://img.shields.io/github/stars/mesutakcan/AS-AppBox?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/mesutakcan/AS-AppBox?style=social)
@@ -17,15 +17,17 @@ AS AppBox is an application manager that helps you organize and quickly launch y
 
 - Add and remove applications from your list
 - Run selected applications with one click
-- Filter applications with real-time search (with cue banner text)
-- Save and load your application list (UTF-8 encoding)
+- Filter applications by file name or full path with real-time search
+- Manage multiple application lists: open, save, and save as separate `.txt` files
+- Restore the last-used list on startup
 - Drag and drop support for adding apps
 - Context menu for quick actions
 - Multiple view modes (list/icon with small and large icons)
 - Open file locations in Explorer
 - Copy the full path(s) of selected applications
 - Column sorting (click column headers to sort, remembers preference)
-- Window position, size, and view mode remembered across sessions
+- Window title shows the active list name and marks unsaved changes with `*`
+- Window position, size, view mode, sort order, and active list remembered across sessions
 - Toolbar buttons with custom icons (via IconButton class)
 - Compilable to standalone EXE (Ahk2Exe directives included)
 - Automatic legacy encoding migration (ANSI → UTF-8)
@@ -37,11 +39,11 @@ AS AppBox is an application manager that helps you organize and quickly launch y
 
 | File | Description |
 |------|-------------|
-| `AppBox.ahk` | Main application script |
-| `IconButton.ahk` | Icon button class: custom buttons with icon support, grayscale on disabled, DPI-aware |
-| `applist.txt` | Saved application list (auto-generated) |
-| `settings.ini` | User preferences: window state, view mode, sort column (auto-generated) |
-| `icons/` | Toolbar icon files (.ico) used by the application |
+| `src/AppBox.ahk` | Main application script |
+| `src/IconButton.ahk` | Icon button class: custom buttons with icon support, grayscale on disabled, DPI-aware |
+| `src/Lists/applist.txt` | Default application list (created automatically) |
+| `src/settings.ini` | User preferences, including window state, view/sort settings, and last-used list (created automatically) |
+| `src/icons/` | Toolbar icon files (.ico) used by the source script |
 
 ## Installation & Run
 
@@ -56,12 +58,8 @@ AS AppBox is an application manager that helps you organize and quickly launch y
 ### Option 2: Run from source (AHK script)
 
 1. Install [AutoHotkey v2](https://www.autohotkey.com/).
-2. Download the project files:
-   - [AppBox.ahk](src/AppBox.ahk): main script
-   - [IconButton.ahk](src/IconButton.ahk): icon button class
-   - `src/icons/` folder: toolbar icon files
-3. Place all files in the same folder.
-4. Double-click `AppBox.ahk` to run.
+2. Download the project and keep the `src/` folder structure intact, including `AppBox.ahk`, `IconButton.ahk`, and the `icons/` folder.
+3. Double-click [src/AppBox.ahk](src/AppBox.ahk) to run.
 
 ## Usage
 
@@ -69,9 +67,11 @@ AS AppBox is an application manager that helps you organize and quickly launch y
 - **Remove:** Remove selected applications.
 - **Run:** Launch selected applications.
 - **Save:** Save your application list.
+- **Open list / Save list as:** Open another list or save the current list to a separate `.txt` file from the File menu.
 - **Switch view:** Cycle through four view modes: list with small icons, list with large icons, icon view with small icons, icon view with large icons.
 - **Exit:** Exit the application.
 - **Clear filter (×):** The small button next to the filter box clears the current filter text.
+- The window title shows the active list file name. An asterisk (`*`) indicates unsaved changes.
 
 ### Keyboard Shortcuts
 
@@ -79,6 +79,8 @@ AS AppBox is an application manager that helps you organize and quickly launch y
 | Key | Action |
 |-----|--------|
 | `Ctrl+F` | Go to the filter box |
+| `Ctrl+O` | Open a list |
+| `Ctrl+Shift+S` | Save list as |
 | `Insert` | Add applications |
 | `Ctrl+S` | Save list |
 | Drag & drop | Add files or folders |
@@ -99,6 +101,17 @@ AS AppBox is an application manager that helps you organize and quickly launch y
 | Click column header | Sort the list |
 
 ## History
+
+- **v1.2** : 2026-10-21
+  - Added support for multiple named application lists, with Open List and Save List As commands
+  - Added `Ctrl+O` to open a list and `Ctrl+Shift+S` to save the current list under a new name
+  - Saves the active list path in `settings.ini` and restores that list on startup
+  - Moved the default list to the `Lists/` directory and added migration from the previous root-level `applist.txt`
+  - Added a separate file-name column and filtering by file name or full path
+  - Added a `*` marker for unsaved changes to the active list in the window title
+  - Added list read error handling and a shared atomic writer for Save and Save As
+  - Centralized adding files from the picker and drag-and-drop, with duplicate counts in the status bar
+  - Added a trailing slash to drive-root working directories when launching applications
 
 - **v1.1** : 2026-10-13
   - Added `IconButton.ahk`: custom button class with icon support, grayscale-on-disabled, and DPI awareness

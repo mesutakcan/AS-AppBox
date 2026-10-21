@@ -3,8 +3,8 @@ AS AppBox
 -----------------------------
 This script serves as an application manager that helps organize and manage your frequently used programs.
 -----------------------------
-v1.1
-2026-10-13
+v1.2
+2026-10-21
 -----------------------------
 Mesut Akcan
 makcan@gmail.com
@@ -15,7 +15,7 @@ github.com/mesutakcan
 */
 ;@Ahk2Exe-SetDescription AS AppBox - Application Manager
 ;@Ahk2Exe-SetCopyright ©2026 Mesut Akcan
-;@Ahk2Exe-SetFileVersion 1.1
+;@Ahk2Exe-SetFileVersion 1.2
 ;@Ahk2Exe-SetMainIcon icons\appbox.ico
 ;@Ahk2Exe-AddResource icons\add.ico, 160
 ;@Ahk2Exe-AddResource icons\remove.ico, 161
@@ -30,8 +30,10 @@ github.com/mesutakcan
 #Include IconButton.ahk
 
 appName := "AS AppBox"
-appVer := "1.1"
-listFile := A_ScriptDir "\applist.txt"
+appVer := "1.2"
+listsDir := A_ScriptDir "\Lists"
+defaultListFile := listsDir "\applist.txt"
+listFile := ""
 appListChanged := false
 
 appList := []
@@ -52,7 +54,7 @@ if (viewMode < 0 || viewMode > 3)
 sortCol := 0
 sortDesc := false
 try sortCol := Integer(IniRead(settingsFile, "Sort", "Column", "0"))
-try sortDesc := Integer(IniRead(settingsFile, "Sort", "Descending", "0")) ? true : false
+try sortDesc := (IniRead(settingsFile, "Sort", "Descending", "0") != "0")
 if (sortCol < 0 || sortCol > 2)
 	sortCol := 0
 
@@ -67,16 +69,18 @@ toolIcons := Map(
 	"save", ToolIcon("save", 163),
 	"switch", ToolIcon("switch", 164),
 	"exit", ToolIcon("exit", 165),
-	"clear", ToolIcon("clear", 166)
+	"clear", ToolIcon("clear", 166, 20)
 )
 
 menuTxt := {
 	add: "&Add",
 	remove: "Re&move selected",
 	run: "&Run application",
-	open: "&Open file location",
+	openList: "&Open list...`tCtrl+O",
+	openLocation: "Open file &location",
 	copy: "&Copy full path",
 	save: "&Save list`tCtrl+S",
+	saveAs: "Save list &as...`tCtrl+Shift+S",
 	clear: "&Clear list",
 	select: "&Select all",
 	deselect: "&Deselect all",
@@ -123,9 +127,14 @@ mGui.OnEvent("Close", g1Close)
 mGui.OnEvent("DropFiles", DropHandler)
 
 fileMenu := Menu()
-AddMenuItems(fileMenu)
+fileMenu.Add(menuTxt.openList, OpenList)
+fileMenu.Add(menuTxt.save, SaveList)
+fileMenu.Add(menuTxt.saveAs, SaveListAs)
 fileMenu.Add()
 fileMenu.Add(menuTxt.exit, g1Close)
+
+listMenu := Menu()
+AddMenuItems(listMenu)
 
 rcMenu := Menu()
 AddMenuItems(rcMenu)
@@ -135,13 +144,24 @@ helpMenu.Add(menuTxt.shortcuts, ShowShortcuts)
 helpMenu.Add()
 helpMenu.Add(menuTxt.about, About)
 
+A_TrayMenu.Delete()
+A_TrayMenu.Add("Show", ShowMainWindow)
+A_TrayMenu.Add("Open list...", OpenList)
+A_TrayMenu.Add("Add applications...", AddToList)
+A_TrayMenu.Add()
+A_TrayMenu.Add("Exit", g1Close)
+A_TrayMenu.Default := "Show"
+
 mnuBar := MenuBar()
 mnuBar.Add(menuTxt.file, fileMenu)
+mnuBar.Add("&List", listMenu)
 mnuBar.Add(menuTxt.help, helpMenu)
 mGui.MenuBar := mnuBar
 
 #HotIf WinActive("ahk_id " mGui.Hwnd)
 ^s:: (btnSave.Enabled ? SaveList() : SoundBeep())
+^+s:: SaveListAs()
+^o:: OpenList()
 ^f:: FocusFilter()
 #HotIf WinActive("ahk_id " mGui.Hwnd) && !IsFilterFocused()
 Insert:: AddToList()
@@ -154,11 +174,17 @@ NumpadEnter:: RunSelected()
 #HotIf WinActive("ahk_id " mGui.Hwnd) && IsFilterFocused()
 Esc:: ClearFilter()
 Down:: FocusList()
+Enter:: FocusList()
+NumpadEnter:: FocusList()
 #HotIf
 
 mGui.Show(GetShowOptions())
 SetViewMode(viewMode)
-LoadList()
+DirCreate(listsDir)
+lastListFile := ""
+try lastListFile := IniRead(settingsFile, "List", "File", "")
+startupListFile := (lastListFile != "" && FileExist(lastListFile) && !DirExist(lastListFile)) ? lastListFile : defaultListFile
+LoadList(startupListFile, true)
 
 ; --- FUNCTIONS ---
 
@@ -168,6 +194,13 @@ IsFilterFocused() {
 
 IsListFocused() {
 	return WinActive("ahk_id " mGui.Hwnd) && ControlGetFocus("A") = LV1.Hwnd
+}
+
+ShowMainWindow(*) {
+	if (WinGetMinMax(mGui) = -1)
+		WinRestore(mGui)
+	mGui.Show()
+	WinActivate(mGui)
 }
 
 FocusFilter(*) {
@@ -242,6 +275,8 @@ ShowShortcuts(*) {
 		. "  Click a column header - sort the list`n`n"
 		. "Anywhere`n"
 		. "  Ctrl+F - go to the filter box`n"
+		. "  Ctrl+O - open a list`n"
+		. "  Ctrl+Shift+S - save list as`n"
 		. "  Insert - add applications`n"
 		. "  Ctrl+S - save the list`n"
 		. "  Drag & drop - add files or folders"
@@ -249,7 +284,6 @@ ShowShortcuts(*) {
 }
 
 MakeToolButton(opts, text, iconKey, handler) {
-	global mGui, toolIcons
 	btn := IconButton(mGui, opts, text)
 	ic := toolIcons[iconKey]
 	btn.SetIcon(ic[1], ic[2], ic[3], "left")
@@ -258,16 +292,14 @@ MakeToolButton(opts, text, iconKey, handler) {
 }
 
 AddMenuItems(mnu) {
-	global menuTxt
 
 	menuItems := [
 		[menuTxt.add, AddToList, true],
 		[menuTxt.remove, RemoveSelected],
 		[""],
 		[menuTxt.run, RunSelected],
-		[menuTxt.open, OpenFileLocation],
+		[menuTxt.openLocation, OpenFileLocation],
 		[menuTxt.copy, CopyFullPath],
-		[menuTxt.save, SaveList],
 		[menuTxt.clear, ClearList],
 		[""],
 		[menuTxt.select, (*) => SelectAll(true)],
@@ -299,12 +331,25 @@ FilterList(*) {
 	filter := txtFilter.Value
 	LV1.Opt("-Redraw")
 	LV1.Delete()
-	for path in appList {
-		if (filter = "" || InStr(path, filter)) {
-			SplitPath(path, &name)
-			LV1.Add("Icon" (GetIconIndex(path) + 1), name, path)
+
+	if (filter = "") {
+		for item in appList
+			LV1.Add("Icon" item.icon, item.name, item.path)
+	} else {
+		nameMatches := []
+		pathMatches := []
+		for item in appList {
+			if InStr(item.name, filter)
+				nameMatches.Push(item)
+			else if InStr(item.path, filter)
+				pathMatches.Push(item)
 		}
+		for item in nameMatches
+			LV1.Add("Icon" item.icon, item.name, item.path)
+		for item in pathMatches
+			LV1.Add("Icon" item.icon, item.name, item.path)
 	}
+
 	ApplySort()
 	LV1.Opt("+Redraw")
 	UpdateUIState()
@@ -345,11 +390,13 @@ GetIconIndex(path) {
 }
 
 AddToList(*) {
-	global appListChanged
 	files := FileSelect("M35", , "Select Application", "All Files (*.*)")
-	if !files.Length
-		return
+	if files.Length
+		AddMultipleFiles(files, false)
+}
 
+AddMultipleFiles(files, isDrop := false) {
+	global appListChanged
 	added := 0
 	for file in files
 		added += AddToAppList(file) ? 1 : 0
@@ -359,16 +406,22 @@ AddToList(*) {
 		UpdateUIState()
 	}
 
-	skipped := files.Length - added
-	sbMain.SetText(Format("Added: {1}, Duplicates: {2}", added, skipped))
+	if isDrop
+		sbMain.SetText(added ? "Added " added " file(s) by drag & drop" : "No new files added (possibly duplicates)")
+	else {
+		skipped := files.Length - added
+		sbMain.SetText(Format("Added: {1}, Duplicates: {2}", added, skipped))
+	}
+
 	FilterList()
 }
 
 AddToAppList(path) {
 	if appSet.Has(path)
 		return false
+	SplitPath(path, &name)
 	appSet[path] := true
-	appList.Push(path)
+	appList.Push({ path: path, name: name, icon: GetIconIndex(path) + 1 })
 	return true
 }
 
@@ -392,15 +445,15 @@ RemoveSelected(*) {
 	}
 
 	kept := []
-	for path in appList
-		if !doomed.Has(path)
-			kept.Push(path)
+	for item in appList {
+		if !doomed.Has(item.path)
+			kept.Push(item)
+		else
+			appSet.Delete(item.path)
+	}
 
 	removed := appList.Length - kept.Length
 	appList := kept
-	appSet.Clear()
-	for path in kept
-		appSet[path] := true
 
 	if removed {
 		appListChanged := true
@@ -415,6 +468,8 @@ RunSelected(*) {
 	while row := LV1.GetNext(row) {
 		path := LV1.GetText(row, 2)
 		SplitPath(path, , &dir)
+		if (SubStr(dir, -1) = ":")
+			dir .= "\"
 		try {
 			Run(path, dir)
 			ok++
@@ -454,52 +509,129 @@ Join(sep, arr) {
 }
 
 SaveList(*) {
-	global appListChanged
-	tmpFile := listFile ".tmp"
-	try {
-		if FileExist(tmpFile)
-			FileDelete(tmpFile)
-		FileAppend(Join("`n", appList) "`n", tmpFile, "UTF-8")
-		FileMove(tmpFile, listFile, true)
-	} catch as err {
-		MsgBox("Failed to save list.`nError: " err.Message, "Error", "Icon!")
-		return
-	}
+	global appListChanged, listFile, defaultListFile, appList
+	path := listFile ? listFile : defaultListFile
+	if !WriteListFile(path)
+		return false
+	listFile := path
 	appListChanged := false
 	UpdateUIState()
 	sbMain.SetText("Saved " appList.Length " application(s)")
+	return true
 }
 
-LoadList(*) {
-	global appListChanged
-	appList.Length := 0
-	appSet.Clear()
+SaveListAs(*) {
+	global appListChanged, listFile, defaultListFile, appList
+	path := FileSelect("S", listFile ? listFile : defaultListFile, "Save list as", "Text files (*.txt)")
+	if !path
+		return false
 
-	if !FileExist(listFile) {
-		sbMain.SetText("Drop files here or click Add to get started")
-		FilterList()
+	SplitPath(path, , , &ext)
+	if !ext
+		path .= ".txt"
+	if !WriteListFile(path)
+		return false
+
+	listFile := path
+	appListChanged := false
+	UpdateUIState()
+	sbMain.SetText("Saved " appList.Length " application(s)")
+	return true
+}
+
+WriteListFile(path) {
+	tmpFile := path ".tmp"
+	try {
+		if FileExist(tmpFile)
+			FileDelete(tmpFile)
+		paths := []
+		for item in appList
+			paths.Push(item.path)
+		FileAppend(Join("`n", paths) "`n", tmpFile, "UTF-8")
+		FileMove(tmpFile, path, true)
+	} catch as err {
+		MsgBox("Failed to save list.`nError: " err.Message, "Error", "Icon!")
+		return false
+	}
+	return true
+}
+
+OpenList(*) {
+	global appListChanged, listsDir
+	path := FileSelect("1", listsDir, "Open list", "Text files (*.txt)")
+	if !path
 		return
+
+	if appListChanged {
+		result := MsgBox("The list has been modified. Save changes before opening another list?", "Open List", "YesNoCancel Icon?")
+		if (result = "Cancel")
+			return
+		if (result = "Yes" && !SaveList())
+			return
 	}
 
-	text := FileRead(listFile, "UTF-8")
-	migrated := InStr(text, Chr(0xFFFD)) ? true : false
-	if migrated
-		text := FileRead(listFile, "CP0")
+	LoadList(path)
+}
 
+LoadList(path := "", allowMissing := false) {
+	global appList, appSet, appListChanged, listFile, defaultListFile
+	if !path
+		path := defaultListFile
+
+	if (!FileExist(path) && path = defaultListFile) {
+		legacyListFile := A_ScriptDir "\applist.txt"
+		if FileExist(legacyListFile) {
+			try FileCopy(legacyListFile, path, false)
+			catch
+				path := legacyListFile
+		}
+	}
+
+	if !FileExist(path) {
+		if !allowMissing {
+			MsgBox("List file not found:`n" path, "Error", "Icon!")
+			return false
+		}
+		appList.Length := 0
+		appSet.Clear()
+		listFile := path
+		appListChanged := false
+		txtFilter.Value := ""
+		FilterList()
+		sbMain.SetText("Drop files here or click Add to get started")
+		return true
+	}
+
+	try text := FileRead(path, "UTF-8")
+	catch as err {
+		MsgBox("Failed to open list.`nError: " err.Message, "Error", "Icon!")
+		return false
+	}
+
+	migrated := InStr(text, Chr(0xFFFD)) > 0
+	if migrated
+		text := FileRead(path, "CP0")
+
+	appList.Length := 0
+	appSet.Clear()
 	loaded := 0
 	for line in StrSplit(text, "`n", "`r") {
-		path := Trim(line)
-		if (path != "" && AddToAppList(path))
+		itemPath := Trim(line)
+		if (itemPath != "" && AddToAppList(itemPath))
 			loaded++
 	}
 
+	listFile := path
 	appListChanged := migrated
-	sbMain.SetText(loaded ? "Loaded " loaded " application(s)" : "Drop files here or click Add to get started")
+	txtFilter.Value := ""
 	FilterList()
+	sbMain.SetText(loaded ? "Loaded " loaded " application(s)" : "Drop files here or click Add to get started")
+	return true
 }
 
 UpdateUIState(*) {
-	global appListChanged, menuTxt
+	global appListChanged, appList, menuTxt, fileMenu, listMenu, rcMenu
+	UpdateWindowTitle()
 
 	hasSelected := LV1.GetCount("Selected") > 0
 	hasItems := LV1.GetCount() > 0
@@ -507,37 +639,41 @@ UpdateUIState(*) {
 	btnRemove.Enabled := hasSelected
 	btnRun.Enabled := hasSelected
 	btnSave.Enabled := appListChanged
+	try appListChanged ? fileMenu.Enable(menuTxt.save) : fileMenu.Disable(menuTxt.save)
 
 	menuItems := Map(
-		menuTxt.save, appListChanged,
 		menuTxt.remove, hasSelected,
 		menuTxt.run, hasSelected,
 		menuTxt.copy, hasSelected,
 		menuTxt.clear, appList.Length > 0,
 		menuTxt.select, hasItems,
-		menuTxt.deselect, hasItems,
-		menuTxt.open, hasSelected
+		menuTxt.deselect, hasSelected,
+		menuTxt.openLocation, hasSelected
 	)
 
 	for mText, enabled in menuItems {
-		for menu in [fileMenu, rcMenu] {
+		for menu in [listMenu, rcMenu] {
 			try enabled ? menu.Enable(mText) : menu.Disable(mText)
 		}
 	}
 }
 
+UpdateWindowTitle() {
+	global appName, appListChanged, listFile, defaultListFile
+	SplitPath(listFile ? listFile : defaultListFile, &fileName)
+	mGui.Title := (appListChanged ? "*" : "") fileName " - " appName
+}
+
 g1Close(*) {
-	global appListChanged
+	global appListChanged, listFile, defaultListFile, settingsFile
 	if appListChanged {
 		result := MsgBox("The list has been modified. Do you want to save changes?", "Save Changes", "YesNoCancel Icon?")
 		if (result = "Cancel")
 			return true
-		if (result = "Yes") {
-			SaveList()
-			if appListChanged
-				return true
-		}
+		if (result = "Yes" && !SaveList())
+			return true
 	}
+	try IniWrite(listFile ? listFile : defaultListFile, settingsFile, "List", "File")
 	SaveWindowState()
 	ExitApp()
 }
@@ -589,26 +725,11 @@ SetViewMode(mode) {
 	LV1.SetImageList((mode & 1) ? imlLarge : imlSmall, mode < 2)
 }
 
-DropHandler(gObj, gCtrlObj, FileArray, X, Y) {
-	global appListChanged
-
-	if (!FileArray.Length) {
+DropHandler(gObj, gCtrlObj, fileArray, X, Y) {
+	if fileArray.Length
+		AddMultipleFiles(fileArray, true)
+	else
 		sbMain.SetText("No valid files dropped")
-		return
-	}
-
-	added := 0
-	for file in FileArray
-		added += AddToAppList(file) ? 1 : 0
-
-	if (added) {
-		appListChanged := true
-		UpdateUIState()
-		sbMain.SetText("Added " added " file(s) by drag & drop")
-	} else
-		sbMain.SetText("No new files added (possibly duplicates)")
-
-	FilterList()
 }
 
 OpenFileLocation(*) {
