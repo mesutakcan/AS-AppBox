@@ -3,7 +3,7 @@
 [![AutoHotkey](https://img.shields.io/badge/Language-AutoHotkey_v2-green.svg)](https://www.autohotkey.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-blue.svg)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/License-GPL_v3-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.2-brightgreen.svg)](https://github.com/mesutakcan/AS-AppBox/releases)
+[![Version](https://img.shields.io/badge/Version-1.3-brightgreen.svg)](https://github.com/mesutakcan/AS-AppBox/releases)
 
 ![GitHub stars](https://img.shields.io/github/stars/mesutakcan/AS-AppBox?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/mesutakcan/AS-AppBox?style=social)
@@ -33,6 +33,7 @@ AS AppBox is an application manager that helps you organize and quickly launch y
 - Automatic legacy encoding migration (ANSI → UTF-8)
 - Atomic file saving (write to .tmp, then rename) for data safety
 - Multi-item removal confirmation dialog
+- Modal confirmation dialogs that block the main window until a response is given
 - Keyboard shortcuts help dialog
 
 ## Files
@@ -101,6 +102,10 @@ AS AppBox is an application manager that helps you organize and quickly launch y
 | Click column header | Sort the list |
 
 ## History
+
+- **v1.3** : 2026-10-22
+  - Made remove, clear, open-list, and exit confirmation dialogs modal to the main window
+  - Removed the timeout from the Clear List confirmation so it remains open until the user responds
 
 - **v1.2** : 2026-10-21
   - Added support for multiple named application lists, with Open List and Save List As commands
