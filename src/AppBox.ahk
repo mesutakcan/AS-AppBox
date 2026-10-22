@@ -3,8 +3,8 @@ AS AppBox
 -----------------------------
 This script serves as an application manager that helps organize and manage your frequently used programs.
 -----------------------------
-v1.2
-2026-10-21
+v1.3
+2026-10-22
 -----------------------------
 Mesut Akcan
 makcan@gmail.com
@@ -15,7 +15,7 @@ github.com/mesutakcan
 */
 ;@Ahk2Exe-SetDescription AS AppBox - Application Manager
 ;@Ahk2Exe-SetCopyright ©2026 Mesut Akcan
-;@Ahk2Exe-SetFileVersion 1.2
+;@Ahk2Exe-SetFileVersion 1.3
 ;@Ahk2Exe-SetMainIcon icons\appbox.ico
 ;@Ahk2Exe-AddResource icons\add.ico, 160
 ;@Ahk2Exe-AddResource icons\remove.ico, 161
@@ -30,7 +30,7 @@ github.com/mesutakcan
 #Include IconButton.ahk
 
 appName := "AS AppBox"
-appVer := "1.2"
+appVer := "1.3"
 listsDir := A_ScriptDir "\Lists"
 defaultListFile := listsDir "\applist.txt"
 listFile := ""
@@ -40,7 +40,6 @@ appList := []
 appSet := Map()
 appSet.CaseSense := false
 
-; Toolbar icons: [file, index, size].
 iconDir := A_ScriptDir "\icons\"
 if !A_IsCompiled
 	TraySetIcon(iconDir "appbox.ico")
@@ -109,7 +108,7 @@ btnRemove := MakeToolButton("x+5 w86 hp Disabled", "Re&move", "remove", RemoveSe
 btnRun := MakeToolButton("x+5 w66 hp Disabled", "&Run", "run", RunSelected)
 btnSave := MakeToolButton("x+5 w76 hp Disabled", "&Save", "save", SaveList)
 MakeToolButton("x+5 w120 hp", "S&witch view", "switch", SwitchView)
-MakeToolButton("x+5 w76 hp", "&Exit", "exit", g1Close)
+MakeToolButton("x+5 w76 hp", "&Exit", "exit", HandleExitRequest)
 
 LV1 := mGui.Add("ListView", "x10 y+5 r15 w380 Grid +0x40", ["File name", "Full path"])
 LV1.OnEvent("DoubleClick", RunSelected)
@@ -123,7 +122,7 @@ imlLarge := GetSysImageList(true)
 sbMain := mGui.Add("StatusBar")
 sbMain.SetParts(300)
 mGui.OnEvent("Size", GuiResize)
-mGui.OnEvent("Close", g1Close)
+mGui.OnEvent("Close", HandleExitRequest)
 mGui.OnEvent("DropFiles", DropHandler)
 
 fileMenu := Menu()
@@ -131,7 +130,7 @@ fileMenu.Add(menuTxt.openList, OpenList)
 fileMenu.Add(menuTxt.save, SaveList)
 fileMenu.Add(menuTxt.saveAs, SaveListAs)
 fileMenu.Add()
-fileMenu.Add(menuTxt.exit, g1Close)
+fileMenu.Add(menuTxt.exit, HandleExitRequest)
 
 listMenu := Menu()
 AddMenuItems(listMenu)
@@ -149,7 +148,7 @@ A_TrayMenu.Add("Show", ShowMainWindow)
 A_TrayMenu.Add("Open list...", OpenList)
 A_TrayMenu.Add("Add applications...", AddToList)
 A_TrayMenu.Add()
-A_TrayMenu.Add("Exit", g1Close)
+A_TrayMenu.Add("Exit", HandleExitRequest)
 A_TrayMenu.Default := "Show"
 
 mnuBar := MenuBar()
@@ -264,6 +263,7 @@ SaveWindowState() {
 }
 
 ShowShortcuts(*) {
+	mGui.Opt("+OwnDialogs")
 	text := "Filter box`n"
 		. "  Esc - clear the filter`n"
 		. "  Down - move to the list`n`n"
@@ -280,7 +280,7 @@ ShowShortcuts(*) {
 		. "  Insert - add applications`n"
 		. "  Ctrl+S - save the list`n"
 		. "  Drag & drop - add files or folders"
-	MsgBox(text, "Keyboard Shortcuts", "Owner" mGui.Hwnd)
+	MsgBox(text, "Keyboard Shortcuts")
 }
 
 MakeToolButton(opts, text, iconKey, handler) {
@@ -390,6 +390,7 @@ GetIconIndex(path) {
 }
 
 AddToList(*) {
+	mGui.Opt("+OwnDialogs")
 	files := FileSelect("M35", , "Select Application", "All Files (*.*)")
 	if files.Length
 		AddMultipleFiles(files, false)
@@ -439,6 +440,7 @@ RemoveSelected(*) {
 		return
 	}
 
+	mGui.Opt("+OwnDialogs")
 	if (doomed.Count > 1 && MsgBox(Format("Remove {1} selected items from the list?", doomed.Count), "Confirm Remove", "YesNo Icon?") != "Yes") {
 		sbMain.SetText("Operation cancelled")
 		return
@@ -482,8 +484,10 @@ RunSelected(*) {
 	else
 		sbMain.SetText("No items selected")
 
-	if failed.Length
+	if failed.Length {
+		mGui.Opt("+OwnDialogs")
 		MsgBox("Failed to run:`n`n" Join("`n", failed), "Error", "Icon!")
+	}
 }
 
 CopyFullPath(*) {
@@ -522,6 +526,7 @@ SaveList(*) {
 
 SaveListAs(*) {
 	global appListChanged, listFile, defaultListFile, appList
+	mGui.Opt("+OwnDialogs")
 	path := FileSelect("S", listFile ? listFile : defaultListFile, "Save list as", "Text files (*.txt)")
 	if !path
 		return false
@@ -550,6 +555,7 @@ WriteListFile(path) {
 		FileAppend(Join("`n", paths) "`n", tmpFile, "UTF-8")
 		FileMove(tmpFile, path, true)
 	} catch as err {
+		mGui.Opt("+OwnDialogs")
 		MsgBox("Failed to save list.`nError: " err.Message, "Error", "Icon!")
 		return false
 	}
@@ -558,11 +564,13 @@ WriteListFile(path) {
 
 OpenList(*) {
 	global appListChanged, listsDir
+	mGui.Opt("+OwnDialogs")
 	path := FileSelect("1", listsDir, "Open list", "Text files (*.txt)")
 	if !path
 		return
 
 	if appListChanged {
+		mGui.Opt("+OwnDialogs")
 		result := MsgBox("The list has been modified. Save changes before opening another list?", "Open List", "YesNoCancel Icon?")
 		if (result = "Cancel")
 			return
@@ -589,6 +597,7 @@ LoadList(path := "", allowMissing := false) {
 
 	if !FileExist(path) {
 		if !allowMissing {
+			mGui.Opt("+OwnDialogs")
 			MsgBox("List file not found:`n" path, "Error", "Icon!")
 			return false
 		}
@@ -604,6 +613,7 @@ LoadList(path := "", allowMissing := false) {
 
 	try text := FileRead(path, "UTF-8")
 	catch as err {
+		mGui.Opt("+OwnDialogs")
 		MsgBox("Failed to open list.`nError: " err.Message, "Error", "Icon!")
 		return false
 	}
@@ -664,9 +674,10 @@ UpdateWindowTitle() {
 	mGui.Title := (appListChanged ? "*" : "") fileName " - " appName
 }
 
-g1Close(*) {
+HandleExitRequest(*) {
 	global appListChanged, listFile, defaultListFile, settingsFile
 	if appListChanged {
+		mGui.Opt("+OwnDialogs")
 		result := MsgBox("The list has been modified. Do you want to save changes?", "Save Changes", "YesNoCancel Icon?")
 		if (result = "Cancel")
 			return true
@@ -689,7 +700,8 @@ ClearList(*) {
 		return
 	}
 
-	result := MsgBox("All items in the list will be deleted. Are you sure?", "Confirmation", "OKCancel Icon? Default2 T5")
+	mGui.Opt("+OwnDialogs")
+	result := MsgBox("All items in the list will be deleted. Are you sure?", "Confirmation", "OKCancel Icon? Default2")
 	if (result != "OK") {
 		sbMain.SetText("Operation cancelled")
 		return
@@ -742,6 +754,7 @@ OpenFileLocation(*) {
 	path := LV1.GetText(row, 2)
 	if !FileExist(path) {
 		sbMain.SetText("File not found")
+		mGui.Opt("+OwnDialogs")
 		MsgBox("File not found: " path, "Error", "Icon!")
 		return
 	}
@@ -751,6 +764,7 @@ OpenFileLocation(*) {
 }
 
 About(*) {
+	mGui.Opt("+OwnDialogs")
 	MsgBox(Format("
 	(
 		{1} v{2}
@@ -759,5 +773,5 @@ About(*) {
 		mesutakcan.blogspot.com
 		github.com/mesutakcan
 		youtube.com/mesutakcan
-	)", appName, appVer), "About", "Owner" mGui.Hwnd)
+	)", appName, appVer), "About")
 }
